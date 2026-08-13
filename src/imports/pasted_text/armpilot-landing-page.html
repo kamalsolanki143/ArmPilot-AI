@@ -1,0 +1,72 @@
+Prompt
+
+Design a landing page for ArmPilot AI, an Arm64-first LLM Optimization & Benchmark Platform. It helps developers deploy open-source LLMs on Arm-based cloud infrastructure (primary target: AWS Graviton) and automatically find the best-performing configuration — instead of manually guessing batch size, quantization, and thread settings. Match the existing ArmPilot dashboard's visual system exactly: near-black background, dark card surfaces with subtle 1px borders, orange brand accent, monospace/tabular numerals for stats, muted gray secondary text, small-caps section labels (like "TTFT", "SYSTEM STATUS" on the dashboard).
+
+Header (sticky)
+Left: ArmPilot logo mark (orange square, "A") + wordmark "ArmPilot" + small caption "AI · v2.4.1"
+Center/right nav: Product, How It Works, Benchmarks, Docs
+Right: "Log In" (ghost button) + "Get Started" (solid orange button) — both route to the Login/Signup screen
+Hero Section
+Small eyebrow label above headline: "CLOUD AI TRACK" or "ARM64-FIRST INFERENCE" in orange, small-caps, like a dashboard section label
+Headline: something like "Stop guessing your LLM config. Let ArmPilot find it."
+Subheadline: "Deploy open-source LLMs on Arm64 cloud infrastructure, automatically benchmark them, and get the best configuration for latency, throughput, or cost — no manual trial and error."
+Primary CTA: "Get Started Free" (solid orange) → Login/Signup screen, Sign Up tab
+Secondary CTA: "See a Benchmark Report" (ghost button) — can scroll to the report preview section instead of routing away
+Below hero: floating preview mockup of the actual System Overview dashboard (stat cards + throughput/latency charts), scaled down with rounded corners and drop shadow — this is the payoff the user is buying into
+Problem Strip (short, 3-column)
+
+Three small cards, dark surface, showing the pain points directly from the pitch:
+
+"Which batch size?" — developers don't know optimal batch size for their hardware
+"Quantize or not?" — unclear when INT8/INT4 quantization actually helps
+"Wasted cost" — wrong configs mean paying for compute you don't need
+
+Keep these terse — one line each, no paragraphs.
+
+How It Works (numbered horizontal steps, 4 steps)
+
+Reuse the dashboard's stat-card visual style (small-caps label, big number/icon, one-line description) but as a process instead of live metrics:
+
+Deploy — Point ArmPilot at your open-source model on Arm64
+Baseline Benchmark — Automatic TTFT, tokens/sec, throughput, P95 latency, memory measurement
+Optimize — Tests INT8 quantization, KV cache, batch size, thread/CPU affinity configs automatically
+Recommend — Get the best config for lowest latency, highest throughput, or best cost/performance — plus a before/after report
+Feature Grid (match dashboard card style exactly: dark card, small-caps label, accent icon, title, 1-sentence description)
+Optimization Engine — INT8 quantization, KV cache, batch size, thread & CPU affinity tuning
+Recommendation Engine — Rules-based picks for lowest latency, highest throughput, or best cost/performance
+Before vs After Reports — Auto-generated Markdown/HTML comparison reports
+OpenAI-Compatible API — Swap your base URL, keep your existing app code
+
+Use the same 4 accent colors already established on the dashboard (cyan, green, orange, purple) — one per card.
+
+"What We're Not" Section (differentiation, keep short)
+
+Small text block, muted gray, single line: "ArmPilot isn't a full MLOps platform — it's laser-focused on one thing: Arm64-first inference optimization for open-source LLMs." This mirrors the actual positioning in the pitch — don't overbuild this into a big section, it's a one-liner with maybe a subtle border-left accent, like a pull-quote.
+
+Tech/Compatibility Strip
+
+Small muted-gray row with logos/text: "Built on FastAPI · Hugging Face Transformers · ONNX Runtime · llama.cpp · Docker · AWS Graviton" — same low-visual-weight treatment as a "works with" strip
+
+Final CTA Band
+
+Centered: "Ready to stop guessing your LLM config?" + "Get Started Free" button (solid orange, larger) → Login/Signup screen
+
+Footer
+
+Dark, muted gray links (Docs, GitHub, Contact), small ArmPilot logo mark, copyright line
+
+Auth Flow (unchanged from before, still required)
+"Log In" / "Get Started" / any CTA → single Login/Signup screen with tabbed Log In | Sign Up, styled as a centered card matching dashboard card style
+Successful Log In or Sign Up → routes directly to the Dashboard (System Overview) screen, no intermediate steps
+Include loading state on submit buttons ("Logging in..." with spinner)
+Dashboard Sidebar — Add Sign Out (new requirement)
+
+At the very bottom of the left sidebar, below Settings and below the "SYSTEM STATUS" card, add a Sign Out row:
+
+Same style as other nav items (icon + label, muted gray text, hover state lightens background) but visually separated from the main nav list with a thin top border/divider so it doesn't get mistaken for a page
+Icon: logout/exit icon
+Label: "Sign Out"
+On click → routes back to the Landing Page (Screen 1), not the login screen — user should land on the marketing homepage after signing out, with the header showing "Log In" / "Get Started" again as if logged out
+Sidebar order (top to bottom)
+
+Dashboard → Inference → Benchmark → Optimization → AI Recommend → Reports → History → Settings → (divider) → System Status card → (divider) → Sign Out
