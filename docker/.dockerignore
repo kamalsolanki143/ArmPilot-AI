@@ -1,0 +1,64 @@
+# ── Version control ──────────────────────────────────────────────────────────
+.git
+.gitignore
+.gitattributes
+
+# ── Dependencies ─────────────────────────────────────────────────────────────
+node_modules
+.pnpm-store
+__pycache__
+*.pyc
+*.pyo
+*.egg-info
+.eggs
+dist
+build
+
+# ── Environment & secrets ────────────────────────────────────────────────────
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+*.crt
+
+# ── IDE & editor ─────────────────────────────────────────────────────────────
+.vscode
+.idea
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# ── Logs & reports ───────────────────────────────────────────────────────────
+logs/
+reports/
+*.log
+
+# ── Test artifacts ───────────────────────────────────────────────────────────
+.pytest_cache
+.coverage
+htmlcov
+.mypy_cache
+.tox
+.nox
+
+# ── Documentation ────────────────────────────────────────────────────────────
+docs/
+*.md
+!backend/requirements.txt
+!package.json
+
+# ── Docker ───────────────────────────────────────────────────────────────────
+docker/*.log
+
+# ── Models (large files) ─────────────────────────────────────────────────────
+models/
+*.gguf
+*.bin
+
+# ── Figma & build tools ─────────────────────────────────────────────────────
+.figma
+.vite
+.cache

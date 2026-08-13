@@ -1,0 +1,59 @@
+# ══════════════════════════════════════════════════════════════════════════════
+# ArmPilot-AI — Development Docker Compose
+# ══════════════════════════════════════════════════════════════════════════════
+
+services:
+  backend:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.dev
+    container_name: armpilot-backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - ../backend:/app/backend
+      - ../scripts:/app/scripts
+      - ../models:/app/models
+      - ../data:/app/data
+      - ../reports:/app/reports
+      - ../logs:/app/logs
+    env_file:
+      - ../.env
+    environment:
+      - ARMPILOT_DEBUG=true
+      - ARMPILOT_LOG_LEVEL=DEBUG
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/docs"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+
+  frontend:
+    image: node:20-alpine
+    container_name: armpilot-frontend
+    working_dir: /app
+    command: sh -c "corepack enable && pnpm install && pnpm dev"
+    ports:
+      - "8443:8443"
+    volumes:
+      - ..:/app
+    environment:
+      - PORT=8443
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+
+  nginx:
+    image: nginx:alpine
+    container_name: armpilot-nginx
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - backend
+      - frontend
+    restart: unless-stopped

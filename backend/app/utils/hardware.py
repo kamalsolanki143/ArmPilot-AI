@@ -2,6 +2,8 @@
 ArmPilot-AI — Hardware Detection Utilities
 """
 
+from __future__ import annotations
+
 import platform
 import os
 from typing import Any

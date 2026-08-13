@@ -1,0 +1,100 @@
+# ArmPilot-AI — Benchmark Configuration
+# Default settings for benchmark runs
+
+default:
+  runtime: llama.cpp
+  batch_size: 512
+  threads: 4
+  concurrency: 1
+  duration_seconds: 60
+  num_requests: 10
+  max_tokens: 128
+  warmup_requests: 3
+  prompt: "Explain the benefits of ARM64 architecture for AI inference."
+
+test_datasets:
+  - name: "short_prompts"
+    prompts:
+      - "What is ARM64?"
+      - "Explain quantization."
+      - "How does batch inference work?"
+    max_tokens: 64
+    description: "Short factual prompts for quick latency tests"
+
+  - name: "medium_prompts"
+    prompts:
+      - "Explain the benefits of ARM64 architecture for AI inference workloads."
+      - "Describe how INT8 quantization affects model accuracy and inference speed."
+      - "What are the tradeoffs between batch size and latency in LLM serving?"
+    max_tokens: 128
+    description: "Medium-length prompts for standard benchmarking"
+
+  - name: "long_prompts"
+    prompts:
+      - "Write a detailed technical comparison of ARM64 vs x86_64 architectures for machine learning inference, covering memory bandwidth, power efficiency, and SIMD capabilities."
+      - "Explain the complete pipeline of deploying a quantized LLM on an ARM64 server, from model conversion to production serving."
+    max_tokens: 256
+    description: "Long prompts for throughput and memory tests"
+
+  - name: "conversational"
+    prompts:
+      - "System: You are a helpful AI assistant.\nUser: What is machine learning?\nAssistant:"
+      - "System: You are a code expert.\nUser: Write a Python function to sort a list.\nAssistant:"
+    max_tokens: 128
+    description: "Conversational prompts with system instructions"
+
+scenarios:
+  latency_focused:
+    num_requests: 50
+    concurrency: 1
+    max_tokens: 32
+    warmup_requests: 5
+    description: "Low-latency single-request benchmark"
+
+  throughput_focused:
+    num_requests: 100
+    concurrency: 4
+    max_tokens: 128
+    warmup_requests: 3
+    description: "High-throughput concurrent benchmark"
+
+  memory_stress:
+    num_requests: 20
+    concurrency: 1
+    max_tokens: 512
+    warmup_requests: 2
+    description: "Memory-intensive benchmark with long outputs"
+
+  quick_check:
+    num_requests: 5
+    concurrency: 1
+    max_tokens: 16
+    warmup_requests: 1
+    description: "Quick sanity check benchmark"
+
+models:
+  - id: "tiny-llama-1.1b"
+    name: "TinyLlama 1.1B"
+    parameters: "1.1B"
+    quantization: "FP16"
+    expected_tps_range: [5, 50]
+
+  - id: "phi-2-2.7b"
+    name: "Phi-2 2.7B"
+    parameters: "2.7B"
+    quantization: "Q4_K_M"
+    expected_tps_range: [3, 30]
+
+  - id: "mistral-7b"
+    name: "Mistral 7B"
+    parameters: "7B"
+    quantization: "Q4_K_M"
+    expected_tps_range: [1, 15]
+
+thresholds:
+  ttft_warning_ms: 200
+  ttft_critical_ms: 500
+  throughput_warning_tps: 10
+  latency_p99_warning_ms: 1000
+  memory_warning_mb: 4000
+  cpu_saturation_percent: 95

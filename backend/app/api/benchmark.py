@@ -4,7 +4,6 @@ ArmPilot-AI — Benchmark API
 
 from __future__ import annotations
 
-import asyncio
 from fastapi import APIRouter, BackgroundTasks
 
 from app.schemas.benchmark import BenchmarkConfig, BenchmarkRunRequest, BenchmarkRunResponse
@@ -19,16 +18,14 @@ router = APIRouter()
 
 @router.post("/api/benchmark/run")
 async def run_benchmark(request: BenchmarkRunRequest, background_tasks: BackgroundTasks):
-    """Start a benchmark run."""
+    """Start a benchmark run in the background."""
     if benchmark_runner.is_running:
         raise BenchmarkRunningError()
 
-    # Run benchmark in background
     async def _run():
         result = await benchmark_runner.run(request.config)
         storage.save_benchmark(result.id, result.model_dump())
 
-        # Auto-generate recommendations
         recs = recommendation_engine.analyze(result)
         if recs:
             storage.save_report(
@@ -37,7 +34,7 @@ async def run_benchmark(request: BenchmarkRunRequest, background_tasks: Backgrou
             )
             logger.info("Generated %d recommendations for %s", len(recs), result.id)
 
-    background_tasks.add_task(asyncio.coroutine(_run) if False else _run)
+    background_tasks.add_task(_run)
 
     return BenchmarkRunResponse(
         success=True,
@@ -55,7 +52,6 @@ async def run_benchmark_sync(request: BenchmarkRunRequest):
     result = await benchmark_runner.run(request.config)
     storage.save_benchmark(result.id, result.model_dump())
 
-    # Auto-generate recommendations
     recs = recommendation_engine.analyze(result)
 
     return {

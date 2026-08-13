@@ -47,6 +47,14 @@ class Settings(BaseSettings):
     optimization_max_candidates: int = 8
     optimization_benchmark_per_candidate: int = 5
 
+    # ── Auth / JWT ────────────────────────────────────────────────────────
+    jwt_secret_key: str = "change-me-in-production-use-a-real-secret"
+    jwt_algorithm: str = "HS256"
+    jwt_access_token_expire_minutes: int = 60
+    jwt_refresh_token_expire_days: int = 30
+    oauth_github_client_id: str = ""
+    oauth_github_client_secret: str = ""
+
     model_config = {
         "env_file": ".env",
         "env_file_encoding": "utf-8",

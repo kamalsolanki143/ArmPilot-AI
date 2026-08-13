@@ -1,0 +1,43 @@
+# ══════════════════════════════════════════════════════════════════════════════
+# ArmPilot-AI — Development Dockerfile
+# ══════════════════════════════════════════════════════════════════════════════
+
+FROM python:3.12-slim
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    git \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN groupadd -r armuser && useradd -r -g armuser -d /app -s /sbin/nologin armuser
+
+WORKDIR /app
+
+COPY backend/requirements.txt ./
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY backend/ ./backend/
+COPY scripts/ ./scripts/
+COPY package.json pnpm-lock.yaml vite.config.ts tsconfig.json index.html ./
+COPY src/ ./src/
+
+RUN mkdir -p models data reports logs && \
+    chown -R armuser:armuser /app
+
+USER armuser
+
+ENV ARMPILOT_HOST=0.0.0.0 \
+    ARMPILOT_PORT=8000 \
+    ARMPILOT_DEBUG=true \
+    ARMPILOT_LOG_LEVEL=DEBUG \
+    PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1
+
+EXPOSE 8000 8443
+
+HEALTHCHECK --interval=15s --timeout=5s --start-period=10s --retries=3 \
+    CMD curl -f http://localhost:8000/docs || exit 1
+
+WORKDIR /app/backend
+
+CMD ["python", "-m", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]

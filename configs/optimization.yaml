@@ -1,0 +1,96 @@
+# ArmPilot-AI — Optimization Configuration
+# Default settings for optimization runs
+
+default:
+  objective: throughput
+  max_candidates: 8
+  benchmark_per_candidate: 5
+  max_tokens: 128
+
+objectives:
+  throughput:
+    description: "Maximize tokens per second"
+    priority: [tokens_per_second, ttft_ms, memory_mb]
+
+  latency:
+    description: "Minimize time to first token and P95 latency"
+    priority: [ttft_ms, p95_latency_ms, tokens_per_second]
+
+  memory:
+    description: "Minimize memory consumption"
+    priority: [memory_mb, tokens_per_second, ttft_ms]
+
+  balanced:
+    description: "Balance all metrics"
+    priority: [tokens_per_second, ttft_ms, p95_latency_ms, memory_mb]
+
+search_space:
+  quantization_options:
+    - "FP16"
+    - "Q8_0"
+    - "Q5_1"
+    - "Q5_0"
+    - "Q4_1"
+    - "Q4_0"
+    - "Q3_K_M"
+    - "Q4_K_M"
+    - "Q5_K_M"
+    - "IQ4_XS"
+
+  batch_sizes:
+    - 1
+    - 2
+    - 4
+    - 8
+    - 16
+    - 32
+    - 64
+    - 128
+    - 256
+    - 512
+
+  thread_counts:
+    - 1
+    - 2
+    - 4
+    - 6
+    - 8
+    - 12
+    - 16
+
+  context_lengths:
+    - 512
+    - 1024
+    - 2048
+    - 4096
+
+  kv_cache_sizes:
+    - 256
+    - 512
+    - 1024
+    - 2048
+
+profiles:
+  arm_cortex_a76:
+    name: "ARM Cortex-A76"
+    max_threads: 8
+    recommended_batch_sizes: [4, 8, 16]
+    recommended_quantizations: ["Q4_K_M", "Q5_K_M", "Q8_0"]
+
+  arm_neoverse_n1:
+    name: "ARM Neoverse N1"
+    max_threads: 64
+    recommended_batch_sizes: [8, 16, 32, 64]
+    recommended_quantizations: ["Q4_K_M", "Q5_K_M"]
+
+  arm_neoverse_v2:
+    name: "ARM Neoverse V2"
+    max_threads: 64
+    recommended_batch_sizes: [16, 32, 64, 128]
+    recommended_quantizations: ["Q4_K_M", "Q5_K_M", "Q8_0"]
+
+constraints:
+  max_memory_mb: 8192
+  min_throughput_tps: 1.0
+  max_ttft_ms: 2000
+  thermal_throttle_cpu_percent: 90

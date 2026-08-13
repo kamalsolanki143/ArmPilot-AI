@@ -1,15 +1,17 @@
 """
 ArmPilot-AI — Optimization Engine
 Generates candidate configurations, benchmarks each, and selects the best.
+Runs as a non-blocking background task with progress tracking.
 """
 
 from __future__ import annotations
 
 import asyncio
+import time
 import uuid
 from datetime import datetime, timezone
 from itertools import product
-from typing import Any
+from typing import Any, Optional
 
 from app.core.config import settings
 from app.core.logger import logger
@@ -23,28 +25,32 @@ from app.benchmark.runner import benchmark_runner
 
 
 class OptimizationEngine:
-    """Generates and tests optimization candidates."""
+    """Generates and tests optimization candidates as a background task."""
 
     def __init__(self) -> None:
         self._running = False
         self._current_id: str | None = None
+        self._current_result: OptimizationResult | None = None
+        self._task: asyncio.Task[OptimizationResult] | None = None
 
     @property
     def is_running(self) -> bool:
         return self._running
 
+    @property
+    def current_result(self) -> OptimizationResult | None:
+        return self._current_result
+
     def generate_candidates(self, config: OptimizationConfig) -> list[OptimizationCandidate]:
         """Generate a list of candidate configurations to test."""
         candidates: list[OptimizationCandidate] = []
 
-        # Generate combinations
         combos = list(product(
             config.quantization_options,
             config.batch_sizes,
             config.thread_counts,
         ))
 
-        # Limit to max_candidates
         combos = combos[:config.max_candidates]
 
         for i, (quant, batch, threads) in enumerate(combos):
@@ -64,8 +70,11 @@ class OptimizationEngine:
         logger.info("Generated %d optimization candidates", len(candidates))
         return candidates
 
-    async def run(self, config: OptimizationConfig) -> OptimizationResult:
-        """Execute a full optimization run."""
+    def start(self, config: OptimizationConfig) -> str:
+        """
+        Start optimization as a background task (non-blocking).
+        Returns the optimization ID immediately.
+        """
         if self._running:
             raise RuntimeError("An optimization is already running")
 
@@ -73,22 +82,32 @@ class OptimizationEngine:
         self._running = True
         self._current_id = opt_id
 
-        result = OptimizationResult(
+        self._current_result = OptimizationResult(
             id=opt_id,
             status="running",
             config=config,
             timestamp=datetime.now(timezone.utc).isoformat(),
         )
 
-        logger.info("Optimization %s starting — model=%s, objective=%s",
-                     opt_id, config.model, config.objective)
+        self._task = asyncio.create_task(self._run_background(config, self._current_result))
+        logger.info("Optimization %s dispatched as background task", opt_id)
+        return opt_id
+
+    async def _run_background(self, config: OptimizationConfig, result: OptimizationResult) -> OptimizationResult:
+        """Execute the full optimization pipeline in the background."""
+        opt_id = result.id
+        bench_start = time.perf_counter()
+
+        logger.info(
+            "Optimization %s starting — model=%s, objective=%s",
+            opt_id, config.model, config.objective,
+        )
 
         try:
-            # Generate candidates
             result.candidates = self.generate_candidates(config)
             result.current_step = "Running baseline..."
 
-            # Run baseline benchmark first
+            # Baseline benchmark
             baseline_config = BenchmarkConfig(
                 model=config.model,
                 num_requests=config.benchmark_per_candidate,
@@ -103,7 +122,7 @@ class OptimizationEngine:
                 "benchmark_id": baseline_result.id,
             }
 
-            # Test each candidate
+            # Test each candidate sequentially (benchmark_runner has its own concurrency)
             total = len(result.candidates)
             for i, candidate in enumerate(result.candidates):
                 result.current_step = f"Testing candidate {i + 1}/{total}: {candidate.name}"
@@ -131,9 +150,10 @@ class OptimizationEngine:
                     candidate.status = "failed"
                     logger.warning("Candidate %s failed: %s", candidate.id, e)
 
+                # Yield control to the event loop
                 await asyncio.sleep(0)
 
-            # Select best candidate based on objective
+            # Select best candidate
             completed = [c for c in result.candidates if c.status == "completed"]
             if completed:
                 result.best_candidate = self._select_best(completed, config.objective)
@@ -144,9 +164,14 @@ class OptimizationEngine:
             result.status = "completed"
             result.progress_percent = 100.0
             result.current_step = "Optimization complete"
+            result.duration_seconds = round(time.perf_counter() - bench_start, 2)
 
-            logger.info("Optimization %s completed — best: %s",
-                        opt_id, result.best_candidate.name if result.best_candidate else "none")
+            logger.info(
+                "Optimization %s completed — best: %s (%.1fs)",
+                opt_id,
+                result.best_candidate.name if result.best_candidate else "none",
+                result.duration_seconds,
+            )
 
         except Exception as e:
             result.status = "failed"
@@ -156,8 +181,31 @@ class OptimizationEngine:
         finally:
             self._running = False
             self._current_id = None
+            self._task = None
 
         return result
+
+    async def get_progress(self) -> dict[str, Any]:
+        """Return current optimization progress (for polling)."""
+        if not self._running or self._current_result is None:
+            return {"running": False}
+        return {
+            "running": True,
+            "id": self._current_id,
+            "progress_percent": self._current_result.progress_percent,
+            "current_step": self._current_result.current_step,
+            "status": self._current_result.status,
+        }
+
+    async def await_result(self, timeout: float | None = None) -> OptimizationResult | None:
+        """Wait for the background optimization to finish and return the result."""
+        if self._task is None:
+            return self._current_result
+        try:
+            await asyncio.wait_for(self._task, timeout=timeout)
+        except (asyncio.TimeoutError, asyncio.CancelledError):
+            return None
+        return self._current_result
 
     def _select_best(
         self, candidates: list[OptimizationCandidate], objective: str
@@ -170,7 +218,6 @@ class OptimizationEngine:
         elif objective == "memory":
             return min(candidates, key=lambda c: c.memory_mb or float("inf"))
         else:
-            # Balanced: normalize and combine
             return max(candidates, key=lambda c: self._balanced_score(c))
 
     @staticmethod
@@ -180,7 +227,6 @@ class OptimizationEngine:
         ttft = c.ttft_ms or 999
         mem = c.memory_mb or 999
         p95 = c.p95_latency_ms or 999
-        # Higher is better
         return tps * 0.4 + (1000 / max(ttft, 1)) * 0.2 + (1000 / max(p95, 1)) * 0.2 + (10000 / max(mem, 1)) * 0.2
 
     @staticmethod

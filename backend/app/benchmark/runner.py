@@ -1,6 +1,6 @@
 """
 ArmPilot-AI — Benchmark Runner
-Orchestrates benchmark runs with configurable parameters.
+Orchestrates concurrent benchmark runs with configurable concurrency control.
 """
 
 from __future__ import annotations
@@ -20,18 +20,19 @@ from app.services.inference_service import inference_service
 
 
 class BenchmarkRunner:
-    """Runs inference benchmarks and collects metrics."""
+    """Runs inference benchmarks and collects metrics with concurrent execution."""
 
     def __init__(self) -> None:
         self._running = False
         self._current_id: str | None = None
+        self._active_benchmarks: dict[str, asyncio.Task[BenchmarkResult]] = {}
 
     @property
     def is_running(self) -> bool:
         return self._running
 
     async def run(self, config: BenchmarkConfig) -> BenchmarkResult:
-        """Execute a full benchmark run."""
+        """Execute a full benchmark run with concurrent request execution."""
         if self._running:
             raise RuntimeError("A benchmark is already running")
 
@@ -47,8 +48,10 @@ class BenchmarkRunner:
             hardware=get_hardware_info(),
         )
 
-        logger.info("Benchmark %s starting — model=%s, requests=%d, concurrency=%d",
-                     benchmark_id, config.model, config.num_requests, config.concurrency)
+        logger.info(
+            "Benchmark %s starting — model=%s, requests=%d, concurrency=%d",
+            benchmark_id, config.model, config.num_requests, config.concurrency,
+        )
 
         try:
             # Ensure model is loaded
@@ -59,38 +62,46 @@ class BenchmarkRunner:
                     n_batch=config.batch_size,
                 )
 
-            # Warmup
+            # Warmup phase
             if config.warmup_requests > 0:
                 logger.info("Warmup: %d requests", config.warmup_requests)
-                for _ in range(config.warmup_requests):
-                    await self._single_request(config)
+                warmup_sem = asyncio.Semaphore(min(config.concurrency, config.warmup_requests))
+                warmup_tasks = [
+                    self._single_request(config, warmup_sem)
+                    for _ in range(config.warmup_requests)
+                ]
+                await asyncio.gather(*warmup_tasks)
 
-            # Benchmark
-            start_metrics = get_system_metrics()
+            # Concurrent benchmark execution
             bench_start = time.perf_counter()
+            start_metrics = get_system_metrics()
 
+            sem = asyncio.Semaphore(config.concurrency)
+            tasks = [
+                self._single_request(config, sem)
+                for _ in range(config.num_requests)
+            ]
+            raw_results = await asyncio.gather(*tasks, return_exceptions=True)
+
+            bench_duration = time.perf_counter() - bench_start
+            end_metrics = get_system_metrics()
+            proc_metrics = get_process_metrics()
+
+            # Aggregate results
             latencies_ms: list[float] = []
             ttfts_ms: list[float] = []
             total_tokens = 0
             errors = 0
 
-            for i in range(config.num_requests):
-                try:
-                    req_result = await self._single_request(config)
-                    latencies_ms.append(req_result["latency_ms"])
-                    if req_result.get("ttft_ms"):
-                        ttfts_ms.append(req_result["ttft_ms"])
-                    total_tokens += req_result.get("completion_tokens", 0)
-                except Exception as e:
+            for i, res in enumerate(raw_results):
+                if isinstance(res, Exception):
                     errors += 1
-                    logger.warning("Benchmark request %d failed: %s", i + 1, e)
-
-                # Allow other tasks to run
-                await asyncio.sleep(0)
-
-            bench_duration = time.perf_counter() - bench_start
-            end_metrics = get_system_metrics()
-            proc_metrics = get_process_metrics()
+                    logger.warning("Benchmark request %d failed: %s", i + 1, res)
+                else:
+                    latencies_ms.append(res["latency_ms"])
+                    if res.get("ttft_ms"):
+                        ttfts_ms.append(res["ttft_ms"])
+                    total_tokens += res.get("completion_tokens", 0)
 
             # Compute latency percentiles
             latency = LatencyMetrics()
@@ -105,20 +116,20 @@ class BenchmarkRunner:
                 latency.p95_ms = round(self._percentile(sorted_lat, 95), 2)
                 latency.p99_ms = round(self._percentile(sorted_lat, 99), 2)
 
-            # Compute TTFT
             avg_ttft = round(statistics.mean(ttfts_ms), 2) if ttfts_ms else None
 
-            # Compute throughput
+            # Throughput metrics
+            successful = config.num_requests - errors
             tps = round(total_tokens / bench_duration, 2) if bench_duration > 0 else 0
-            rps = round((config.num_requests - errors) / bench_duration, 2) if bench_duration > 0 else 0
+            rps = round(successful / bench_duration, 2) if bench_duration > 0 else 0
 
-            # Update result
+            # Populate result
             result.status = "completed"
             result.ttft_ms = avg_ttft
             result.tokens_per_second = tps
             result.requests_per_second = rps
             result.total_tokens = total_tokens
-            result.total_requests = config.num_requests - errors
+            result.total_requests = successful
             result.latency = latency
             result.cpu_utilization_percent = round(
                 (start_metrics["cpu_utilization_percent"] + end_metrics["cpu_utilization_percent"]) / 2, 1
@@ -127,14 +138,13 @@ class BenchmarkRunner:
             result.memory_peak_mb = round(end_metrics.get("memory_used_mb", 0), 1)
             result.duration_seconds = round(bench_duration, 2)
 
-            # Model size from loader
             if inference_service.runtime and inference_service.runtime.is_loaded():
                 info = inference_service.runtime.get_model_info()
                 result.model_size_mb = info.get("file_size_mb")
 
             logger.info(
-                "Benchmark %s completed — TPS=%.1f, TTFT=%.1fms, P95=%.1fms, Duration=%.1fs",
-                benchmark_id, tps, avg_ttft or 0, latency.p95_ms, bench_duration,
+                "Benchmark %s completed — TPS=%.1f, TTFT=%.1fms, P95=%.1fms, Duration=%.1fs, Concurrency=%d",
+                benchmark_id, tps, avg_ttft or 0, latency.p95_ms, bench_duration, config.concurrency,
             )
 
         except Exception as e:
@@ -148,32 +158,33 @@ class BenchmarkRunner:
 
         return result
 
-    async def _single_request(self, config: BenchmarkConfig) -> dict[str, Any]:
-        """Execute a single inference request and measure timing."""
-        start = time.perf_counter()
+    async def _single_request(self, config: BenchmarkConfig, sem: asyncio.Semaphore) -> dict[str, Any]:
+        """Execute a single inference request with semaphore-based concurrency control."""
+        async with sem:
+            start = time.perf_counter()
 
-        # Use streaming to measure TTFT
-        ttft_ms = None
-        token_count = 0
+            # Stream to measure TTFT
+            ttft_ms = None
+            token_count = 0
 
-        stream = inference_service.runtime.generate_stream(
-            prompt=config.prompt,
-            max_tokens=config.max_tokens,
-            temperature=0.7,
-        )
+            stream = inference_service.runtime.generate_stream(
+                prompt=config.prompt,
+                max_tokens=config.max_tokens,
+                temperature=0.7,
+            )
 
-        for chunk in stream:
-            token_count += 1
-            if chunk.get("is_first") and "ttft_ms" in chunk:
-                ttft_ms = chunk["ttft_ms"]
+            for chunk in stream:
+                token_count += 1
+                if chunk.get("is_first") and "ttft_ms" in chunk:
+                    ttft_ms = chunk["ttft_ms"]
 
-        latency_ms = (time.perf_counter() - start) * 1000
+            latency_ms = (time.perf_counter() - start) * 1000
 
-        return {
-            "latency_ms": latency_ms,
-            "ttft_ms": ttft_ms,
-            "completion_tokens": token_count,
-        }
+            return {
+                "latency_ms": latency_ms,
+                "ttft_ms": ttft_ms,
+                "completion_tokens": token_count,
+            }
 
     @staticmethod
     def _percentile(sorted_data: list[float], p: float) -> float:

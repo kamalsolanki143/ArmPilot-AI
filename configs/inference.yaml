@@ -1,0 +1,82 @@
+# ArmPilot-AI — Inference Configuration
+# Default settings for model inference
+
+defaults:
+  runtime: llama.cpp
+  n_ctx: 2048
+  n_threads: 4
+  n_batch: 512
+  n_gpu_layers: 0
+  max_tokens: 256
+  temperature: 0.7
+  top_p: 0.9
+  stop: []
+  frequency_penalty: 0.0
+  presence_penalty: 0.0
+
+runtimes:
+  llama.cpp:
+    enabled: true
+    backend: llama-cpp-python
+    supported_formats:
+      - .gguf
+    features:
+      - streaming
+      - batch_inference
+      - quantization
+
+  mlx:
+    enabled: false
+    backend: mlx-lm
+    platform: macos-arm64
+    supported_formats:
+      - .safetensors
+      - .gguf
+    features:
+      - metal_acceleration
+      - streaming
+
+  onnx:
+    enabled: false
+    backend: onnxruntime
+    supported_formats:
+      - .onnx
+    features:
+      - quantized_models
+      - multi_executor
+
+models:
+  search_paths:
+    - models/
+    - ~/.cache/armpilot/models/
+    - /opt/models/
+
+  auto_discovery: true
+  supported_extensions:
+    - .gguf
+
+  defaults:
+    context_length: 2048
+    threads: 4
+    batch_size: 512
+    gpu_layers: 0
+
+generation:
+  max_tokens: 4096
+  temperature_range: [0.0, 2.0]
+  top_p_range: [0.0, 1.0]
+  stop_sequences:
+    - "</s>"
+    - "[INST]"
+    - "[/INST]"
+
+streaming:
+  enabled: true
+  chunk_size: 1
+  timeout_seconds: 30
+
+request_limits:
+  max_concurrent_requests: 16
+  max_queue_size: 64
+  request_timeout_seconds: 120
+  max_prompt_length: 32768
