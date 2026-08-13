@@ -216,3 +216,10 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Node & IDE
+node_modules/
+.DS_Store
+dist/
+.figma/
+
