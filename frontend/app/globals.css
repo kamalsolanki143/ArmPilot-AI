@@ -1,26 +1,84 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #0b0f19;
+  --foreground: #f3f4f6;
+  --card-bg: #111827;
+  --card-border: #1f293d;
+  --card-hover: #162032;
+  --brand-orange: #ea580c;
+  --brand-orange-bright: #ff7315;
+  --brand-orange-light: #fdba74;
+  --brand-cyan: #06b6d4;
+  --brand-green: #10b981;
+  --brand-amber: #f97316;
+  --brand-purple: #a855f7;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-geist-sans), system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  background-color: #0b0f19;
+  color: #f3f4f6;
+  font-family: var(--font-sans);
+  min-height: 100%;
+}
+
+/* Custom modern scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #0b0f19;
+}
+::-webkit-scrollbar-thumb {
+  background: #1f293d;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #374151;
+}
+
+/* Subtle pulse animation for server status & live badges */
+@keyframes statusPulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.4;
+    transform: scale(0.95);
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+.animate-status-pulse {
+  animation: statusPulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* Custom range slider styling */
+input[type="range"] {
+  accent-color: #ea580c;
+}
+
+/* Subtle glow utility without being excessive */
+.glow-subtle-orange {
+  box-shadow: 0 0 20px -5px rgba(234, 88, 12, 0.25);
+}
+
+.glow-subtle-cyan {
+  box-shadow: 0 0 20px -5px rgba(6, 182, 212, 0.2);
+}
+
+.glow-subtle-green {
+  box-shadow: 0 0 20px -5px rgba(16, 185, 129, 0.2);
 }
