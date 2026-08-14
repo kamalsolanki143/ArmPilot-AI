@@ -1,8 +1,8 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   LogoIcon,
   DashboardIcon,
@@ -16,6 +16,7 @@ import {
   CpuChipIcon,
   ArrowRightIcon,
 } from "./Icons";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -29,7 +30,29 @@ export default function AppLayout({
   headerActions,
 }: AppLayoutProps) {
   const pathname = usePathname();
+  const router = useRouter();
+  const { user, isAuthenticated, isLoading, logout } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
+  const profileRef = useRef<HTMLDivElement>(null);
+
+  // Close profile dropdown on outside click
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (profileRef.current && !profileRef.current.contains(e.target as Node)) {
+        setProfileOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  // Redirect to login if unauthenticated
+  useEffect(() => {
+    if (!isLoading && !isAuthenticated) {
+      router.replace("/login");
+    }
+  }, [isLoading, isAuthenticated, router]);
 
   const navItems = [
     {
@@ -79,6 +102,28 @@ export default function AppLayout({
   // Derive breadcrumb page name if not provided
   const currentNav = navItems.find((item) => item.href === pathname);
   const displayTitle = pageTitle || currentNav?.label || "Dashboard";
+
+  const handleSignOut = () => {
+    setProfileOpen(false);
+    logout();
+    router.push("/login");
+  };
+
+  // Show loading spinner while checking auth
+  if (isLoading) {
+    return (
+      <div className="flex h-screen w-full bg-[#0B0F19] items-center justify-center">
+        <div className="w-6 h-6 border-2 border-orange-500 border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  // Don't render layout if not authenticated (redirect will happen)
+  if (!isAuthenticated) return null;
+
+  const avatarInitial = user?.avatarInitial || user?.fullName?.charAt(0).toUpperCase() || "A";
+  const displayName = user?.fullName || "ArmPilot Admin";
+  const displayEmail = user?.email || "admin@armpilot.dev";
 
   return (
     <div className="flex h-screen w-full bg-[#0B0F19] text-[#F3F4F6] overflow-hidden font-sans">
@@ -260,14 +305,77 @@ export default function AppLayout({
 
             {headerActions && <div>{headerActions}</div>}
 
-            {/* User Avatar */}
-            <div className="flex items-center gap-2 pl-1 sm:pl-2">
-              <div
-                title="ArmPilot Admin"
-                className="w-8 h-8 rounded-full bg-[#E5D5C5] text-[#2C241D] flex items-center justify-center font-bold text-xs shadow-inner cursor-pointer hover:ring-2 hover:ring-orange-500 transition-all"
+            {/* User Avatar & Profile Dropdown */}
+            <div className="relative" ref={profileRef}>
+              <button
+                onClick={() => setProfileOpen(!profileOpen)}
+                className="flex items-center gap-2 pl-1 sm:pl-2 cursor-pointer group"
+                aria-label="User menu"
               >
-                A
-              </div>
+                <div
+                  title={displayName}
+                  className={`w-8 h-8 rounded-full bg-[#E5D5C5] text-[#2C241D] flex items-center justify-center font-bold text-xs shadow-inner transition-all ${
+                    profileOpen
+                      ? "ring-2 ring-orange-500"
+                      : "hover:ring-2 hover:ring-orange-500"
+                  }`}
+                >
+                  {avatarInitial}
+                </div>
+              </button>
+
+              {/* Profile Dropdown */}
+              {profileOpen && (
+                <div className="absolute right-0 top-full mt-2 w-64 rounded-xl bg-[#111827] border border-[#1F293D] shadow-2xl shadow-black/40 overflow-hidden z-50">
+                  {/* User Info Header */}
+                  <div className="px-4 py-3 border-b border-[#1F293D]">
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-full bg-[#E5D5C5] text-[#2C241D] flex items-center justify-center font-bold text-sm shadow-inner shrink-0">
+                        {avatarInitial}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-white truncate">{displayName}</p>
+                        <p className="text-xs text-zinc-400 truncate">{displayEmail}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Menu Items */}
+                  <div className="py-1.5">
+                    <Link
+                      href="/profile"
+                      onClick={() => setProfileOpen(false)}
+                      className="flex items-center gap-3 px-4 py-2.5 text-sm text-zinc-300 hover:bg-[#162032] hover:text-white transition-colors"
+                    >
+                      <svg className="w-4 h-4 text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                      </svg>
+                      <span>Profile</span>
+                    </Link>
+                    <Link
+                      href="/settings"
+                      onClick={() => setProfileOpen(false)}
+                      className="flex items-center gap-3 px-4 py-2.5 text-sm text-zinc-300 hover:bg-[#162032] hover:text-white transition-colors"
+                    >
+                      <SettingsIcon className="w-4 h-4 text-zinc-400" />
+                      <span>Settings</span>
+                    </Link>
+                  </div>
+
+                  {/* Sign Out */}
+                  <div className="border-t border-[#1F293D] py-1.5">
+                    <button
+                      onClick={handleSignOut}
+                      className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-red-400 hover:bg-red-500/10 transition-colors text-left"
+                    >
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                      </svg>
+                      <span>Sign out</span>
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </header>

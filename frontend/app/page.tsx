@@ -88,7 +88,7 @@ export default function LandingPage() {
 
           <div className="flex items-center gap-3">
             <Link
-              href="/dashboard"
+              href="/login"
               className="px-4 py-2 rounded-lg bg-[#EA580C] hover:bg-[#FF7315] text-white text-xs sm:text-sm font-semibold shadow-lg shadow-orange-600/25 flex items-center gap-2 transition-all hover:scale-[1.02] cursor-pointer"
             >
               <span>Launch App</span>
@@ -126,7 +126,7 @@ export default function LandingPage() {
               {/* CTAs */}
               <div className="pt-2 flex flex-col sm:flex-row items-stretch sm:items-center gap-3.5">
                 <Link
-                  href="/dashboard"
+                  href="/login"
                   className="px-6 py-3.5 rounded-lg bg-[#EA580C] hover:bg-[#FF7315] text-white text-sm font-bold shadow-xl shadow-orange-600/25 flex items-center justify-center gap-2.5 transition-all hover:scale-[1.02] cursor-pointer"
                 >
                   <ZapIcon className="w-4 h-4" />
@@ -740,7 +740,7 @@ export default function LandingPage() {
 
           <div className="pt-4 flex flex-col sm:flex-row items-center justify-center gap-4">
             <Link
-              href="/dashboard"
+              href="/login"
               className="w-full sm:w-auto px-8 py-3.5 rounded-lg bg-[#EA580C] hover:bg-[#FF7315] text-white text-sm font-bold shadow-xl shadow-orange-600/30 flex items-center justify-center gap-2 transition-all hover:scale-[1.02] cursor-pointer"
             >
               <span>Launch Dashboard</span>
